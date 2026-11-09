@@ -42,12 +42,12 @@ static void eff_geom(const float *u, int *by, RefTag *tags, int *nt)
     snprintf(tags[1].text, sizeof tags[1].text, "HI %.1f", (u[1] - 400) / 10.0);
     tags[1].xr = 126; tags[1].yb = 62; *nt = 2;
 }
-static void eff_randk(float *u) { u[0] = (float)(rand() % 401); u[1] = (float)(rand() % 401); u[2] = (float)(rand() % 16); }
-static void eff_line(const float *u, double *line, double *rpd) { *line = (u[0] - 400.0) / 10.0; *rpd = (u[2] + 1.0) / 2.0; }
+static void eff_randk(float *u) { u[0] = (float)(rand() % 401); u[1] = (float)(rand() % 401); u[3] = (float)(rand() % 16); }
+static void eff_line(const float *u, double *line, double *rpd) { *line = (u[0] - 400.0) / 10.0; *rpd = (u[3] + 1.0) / 2.0; }
 
 int main(void)
 {
-    static const float udef[EFF_NK] = { 400.0f, 400.0f, 1.0f, 9.0f, 2.0f, 1.0f, 4.0f, 4.0f, 100.0f };
+    static const float udef[EFF_NK] = { 400.0f, 400.0f, 9.0f, 1.0f, 2.0f, 1.0f, 4.0f, 4.0f, 100.0f };
     float u[EFF_NK], pk;
     int g, b, r, w;
 

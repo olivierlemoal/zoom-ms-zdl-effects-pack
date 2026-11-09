@@ -320,8 +320,8 @@ Gooey's compressor split in a low and a high band, so a loud low note is held on
 |---|---|---|
 | LoThr | -40 .. 0 dB | Low band threshold in 0.1 dB steps. 0 = OFF (that band is not compressed). Default 0. |
 | HiThr | -40 .. 0 dB | High band threshold, same scale. Default 0. |
-| Zoom | x0.5 .. x8.0 | Meter only: rows a dB, scaled around the LoThr line. Default x1. |
 | XOver | 60 .. 400 Hz | Crossover between the bands, log steps. Default 141 Hz. |
+| Zoom | x0.5 .. x8.0 | Meter only: rows a dB, scaled around the LoThr line. Default x1. |
 | LoRat | 1.5, 2, 4, 10 | Low band ratio. Default 4. |
 | HiRat | 1.5, 2, 4, 10 | High band ratio. Default 2. |
 | Attck | 0.1, 0.3, 1, 3, 10, 30 ms | Both bands. Default 10 ms. |
