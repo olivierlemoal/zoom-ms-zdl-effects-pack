@@ -234,7 +234,7 @@ A transparent look-ahead limiter in the Pro-L / Ozone Maximizer family: it pushe
 | Style | CLEAN, PUNCH, LOUD | Only the saturation before the limiter and how much transient gets through (never the release). CLEAN has none, PUNCH adds a little and lets transients through a little, LOUD is the densest. |
 | Mix | 0..100 | Dry/wet crossfade, DJ style (parallel limiting). The dry is delayed like the wet, so a part Mix never sounds like a comb filter. |
 
-At Gain 0 and Mix 100, a signal under the ceiling comes out unchanged (just 1.5 ms later). The cover is a live meter drawn by the effect itself: a scrolling history of the last 4 beats of the level after Gain (one column = 1/32 beat), with the ceiling as a centered line tagged CEIL and GAIN. What pokes out of the box above the line is what the limiter takes off. It scrolls with the MIDI clock when it runs, else with tap or patch tempo. It works on any MS-70CDR on firmware 2.10, stock included; on other firmware the cover stays static.
+At Gain 0 and Mix 100, a signal under the ceiling comes out unchanged (just 1.5 ms later). The cover is a live meter drawn by the effect itself: a scrolling history of the last 4 beats of the level after Gain (one column = 1/32 beat), with the ceiling as a centered line tagged CEIL and GAIN. What pokes out of the box above the line is what the limiter takes off. It scrolls with the MIDI clock when it runs, else with tap or patch tempo. It works on any MS-70CDR on firmware 2.10, stock included, and on the MS-50G firmware 3.10 (addresses mapped from its OS, see `src/custom/common/zdl_meter.h`); on other firmware the cover stays static.
 
 ### DJFilter: a DJ filter and kick kill
 
@@ -311,7 +311,7 @@ An SSL G-bus style VCA compressor to glue a mix: one character, done well. One g
 | Mix | 0..100 | Linear dry/wet blend like the Digitakt compressor (parallel compression), so Mix 50 is not louder. Default 100. |
 | SC HP | OFF, 20 .. 300 Hz | High-pass on the detector only (12 dB/oct). Default OFF. |
 
-Try: Thrsh -12, Ratio 2, Attck 30 ms, Rels AUTO, MkUp AUTO, SC HP 100 Hz on a full mix for glue; Ratio 10, Attck 1 ms, Mix 50 on drums for parallel punch. The cover is a live meter drawn by the effect itself: a scrolling history of the last 4 beats of the output level (one column = 1/32 beat), with the threshold as a centered line tagged THRSH. It scrolls with the MIDI clock when it runs, else with tap or patch tempo. It works on any MS-70CDR on firmware 2.10, stock included; on other firmware the cover stays static.
+Try: Thrsh -12, Ratio 2, Attck 30 ms, Rels AUTO, MkUp AUTO, SC HP 100 Hz on a full mix for glue; Ratio 10, Attck 1 ms, Mix 50 on drums for parallel punch. The cover is a live meter drawn by the effect itself: a scrolling history of the last 4 beats of the output level (one column = 1/32 beat), with the threshold as a centered line tagged THRSH. It scrolls with the MIDI clock when it runs, else with tap or patch tempo. It works on any MS-70CDR on firmware 2.10, stock included, and on the MS-50G firmware 3.10 (addresses mapped from its OS, see `src/custom/common/zdl_meter.h`); on other firmware the cover stays static.
 
 ### GRDLOOP: a bar-synced looper on the song grid
 

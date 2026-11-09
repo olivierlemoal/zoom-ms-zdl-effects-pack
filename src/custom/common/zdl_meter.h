@@ -16,7 +16,7 @@
  * Event_post(*(void**)0xC00EF9D8, 0x01). At most one frame start every ZM_GAP blocks (15 a second).
  *
  * Firmware reads and the call happen ONLY after zm_fw_ok() (the first 20 bytes of Event_post
- * match 2.10, the event handle is in RAM). Any other firmware: the cover stays frame A (built at
+ * match 2.10, or MS-50G 3.10 at its own addresses; the event handle is in RAM). Any other firmware: the cover stays frame A (built at
  * default knobs, empty history) and the meter costs one compare per block. Off screen it costs a
  * counter per block and a few loads every ZM_CHECK blocks: no level, no tempo, no rendering.
  * Coming back on screen clears the history (nothing was measured meanwhile).
@@ -60,11 +60,15 @@ typedef char zm_cap_check[(ZM_CAP >= 1536u && ZM_TOP <= 24u) ? 1 : -1];
 #define ZM_FW_OK() zm_fw_ok()
 #endif
 #ifndef ZM_POST
-#define ZM_POST() zm_post()
+#define ZM_POST() zm_post(z->fw)
 #endif
 #ifndef ZM_FIND
-#define ZM_FIND(params) zm_find(params)
+#define ZM_FIND(params) zm_find(z->fw, params)
 #endif
+
+#define ZM_FW_70   1u                       /* MS-70CDR 2.10 */
+#define ZM_FW_50   2u                       /* MS-50G 3.10 (also an MS-60B running its OS) */
+#define ZM_AT(fw, a70, a50) ((fw) == ZM_FW_50 ? (a50) : (a70))
 
 typedef struct {                            /* make_v12.btag: 1 px black border, white box, black text */
     unsigned int x0, x1, ix0, tx0, xr, yb;  /* border x0..x1, white ix0..xr, text tx0..xr-1   */
@@ -87,42 +91,53 @@ typedef struct {
     unsigned short lv[256];                 /* history ring: level per column (zm_level)       */
 } ZmState;
 
-/* Pure reads: is this MS-70CDR 2.10 with a live UI event? Call once, keep the result. */
-ZM_INLINE(zm_fw_ok)
-static inline unsigned int zm_fw_ok(void)
+/* Pure reads: 0, ZM_FW_70 or ZM_FW_50 when Event_post matches that build and its UI event is live.
+ * Call once, keep the result. */
+ZM_INLINE(zm_ev_ok)
+static inline unsigned int zm_ev_ok(unsigned int ev)
 {
-    const volatile unsigned int *code = (const volatile unsigned int *)0xC00CBF40u;
-    unsigned int ev;
-    if (code[0] != 0x27773577u || code[1] != 0x85778677u || code[2] != 0xB64631F7u ||
-        code[3] != 0x02E7442Bu || code[4] != 0x01E74228u) return 0u;
-    ev = *(const volatile unsigned int *)0xC00EF9D8u;
     return (((ev >= 0xC0000000u && ev < 0xC8000000u) || (ev >= 0x11800000u && ev < 0x11840000u)) &&
             (ev & 3u) == 0u) ? 1u : 0u;
 }
 
+ZM_INLINE(zm_fw_ok)
+static inline unsigned int zm_fw_ok(void)
+{
+    const volatile unsigned int *c70 = (const volatile unsigned int *)0xC00CBF40u;
+    const volatile unsigned int *c50 = (const volatile unsigned int *)0xC00CC680u;
+    if (c70[0] == 0x27773577u && c70[1] == 0x85778677u && c70[2] == 0xB64631F7u &&
+        c70[3] == 0x02E7442Bu && c70[4] == 0x01E74228u)
+        return zm_ev_ok(*(const volatile unsigned int *)0xC00EF9D8u) ? ZM_FW_70 : 0u;
+    if (c50[0] == 0x27773577u && c50[1] == 0x85778677u && c50[2] == 0xB64631F7u &&
+        c50[3] == 0x02E9C02Bu && c50[4] == 0x01E9BE28u)
+        return zm_ev_ok(*(const volatile unsigned int *)0xC00EFF64u) ? ZM_FW_50 : 0u;
+    return 0u;
+}
+
 /* Event_post(ui_event, EV_REDRAW): redraws the page and the cover. Only after zm_fw_ok. */
 ZM_INLINE(zm_post)
-static inline void zm_post(void)
+static inline void zm_post(unsigned int fw)
 {
-    void *ev = (void *)(uintptr_t)*(const volatile unsigned int *)0xC00EF9D8u;
-    ((void (*)(void *, unsigned int))(uintptr_t)0xC00CBF40u)(ev, 0x01u);
+    void *ev = (void *)(uintptr_t)*(const volatile unsigned int *)(uintptr_t)ZM_AT(fw, 0xC00EF9D8u, 0xC00EFF64u);
+    ((void (*)(void *, unsigned int))(uintptr_t)ZM_AT(fw, 0xC00CBF40u, 0xC00CC680u))(ev, 0x01u);
 }
 
 /* The imageInfo the firmware draws our cover from, or 0 when our cover is not on screen: effect
  * screen (mode 0), cover page (not the knob page), the cursor's slot runs this instance (its params
- * pointer), and the slot's imageInfo is an RLE picture pointing at one of our buffers. 2.10 only. */
+ * pointer), and the slot's imageInfo is an RLE picture pointing at one of our buffers. Only the
+ * screen mode and the slot table moved in the MS-50G 3.10 build. */
 ZM_INLINE(zm_find)
-static inline volatile unsigned int *zm_find(const void *params)
+static inline volatile unsigned int *zm_find(unsigned int fw, const void *params)
 {
     unsigned int view, slot, a = (unsigned int)(uintptr_t)ZM_PIC, ip;
     int cur;
     volatile unsigned int *info;
-    if (*(const volatile unsigned int *)0xC00EF888u != 0u) return 0;          /* screen mode */
+    if (*(const volatile unsigned int *)(uintptr_t)ZM_AT(fw, 0xC00EF888u, 0xC00EFE08u) != 0u) return 0; /* screen mode */
     if (*(const volatile unsigned int *)0xC009D398u != 0u) return 0;          /* knob page shown */
     view = *(const volatile unsigned int *)0xC009D8F8u;
     cur = (int)*(const volatile signed char *)0xC009C064u;
     if (view > 5u || cur < 0 || cur > 5) return 0;
-    slot = *(const volatile unsigned int *)(uintptr_t)(0xC00EE748u + 4u * (6u * view + (unsigned int)cur));
+    slot = *(const volatile unsigned int *)(uintptr_t)(ZM_AT(fw, 0xC00EE748u, 0xC00EECB0u) + 4u * (6u * view + (unsigned int)cur));
     if (slot > 5u) return 0;
     if (*(const volatile unsigned int *)(uintptr_t)(0x11F03004u + 212u * slot) != (unsigned int)(uintptr_t)params) return 0;
     ip = *(const volatile unsigned int *)(uintptr_t)(0xC0064E08u + 28u * slot);
