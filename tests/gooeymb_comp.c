@@ -20,7 +20,7 @@ static int fails;
 static float inL[MAXN], inR[MAXN], outL[MAXN], outR[MAXN], refL[MAXN];
 static GmState S;
 
-/* screen values: LoThr, HiThr, Zoom, XOver, LoRat, HiRat, Attck, Rels, Mix */
+/* screen values: LoThr, HiThr, XOver, Zoom, LoRat, HiRat, Attck, Rels, Mix */
 typedef struct { float lo, hi, xo, lr, hr, att, rel, mix; } K;
 static K kd(void) { K k = { 400, 400, 9, 2, 1, 4, 4, 100 }; return k; }
 
@@ -31,7 +31,7 @@ static void run_from(int n, K k, int from_block, K k2)
     for (b = 0; b < n / 8; b++) {
         float buf[16];
         K c = (b < from_block) ? k : k2;
-        u[0] = c.lo; u[1] = c.hi; u[2] = 1; u[3] = c.xo; u[4] = c.lr; u[5] = c.hr; u[6] = c.att; u[7] = c.rel; u[8] = c.mix;
+        u[0] = c.lo; u[1] = c.hi; u[2] = c.xo; u[3] = 1; u[4] = c.lr; u[5] = c.hr; u[6] = c.att; u[7] = c.rel; u[8] = c.mix;
         for (i = 0; i < 8; i++) { buf[i] = inL[b * 8 + i]; buf[i + 8] = inR[b * 8 + i]; }
         gm_prepare(&P, &S, u);
         gm_process(&S, &P, buf);
@@ -203,9 +203,10 @@ int main(void)
     /* ---- labels ---- */
     {
         char t[16];
-        ZDL_GetLabel_3(0, t);  CHECK(!strcmp(t, "60Hz"), "XOver 0 label %s", t);
-        ZDL_GetLabel_3(9, t);  CHECK(!strcmp(t, "141Hz"), "XOver 9 label %s", t);
-        ZDL_GetLabel_3(20, t); CHECK(!strcmp(t, "400Hz"), "XOver 20 label %s", t);
+        ZDL_GetLabel_2(0, t);  CHECK(!strcmp(t, "60Hz"), "XOver 0 label %s", t);
+        ZDL_GetLabel_2(9, t);  CHECK(!strcmp(t, "141Hz"), "XOver 9 label %s", t);
+        ZDL_GetLabel_2(20, t); CHECK(!strcmp(t, "400Hz"), "XOver 20 label %s", t);
+        ZDL_GetLabel_3(1, t);  CHECK(!strcmp(t, "x1.0"), "Zoom 1 label %s", t);
         ZDL_GetLabel_0(400, t); CHECK(!strcmp(t, "0"), "LoThr 400 label %s", t);
         ZDL_GetLabel_1(225, t); CHECK(!strcmp(t, "-17.5"), "HiThr 225 label %s", t);
         ZDL_GetLabel_4(0, t);  CHECK(!strcmp(t, "1.5:1"), "LoRat 0 label %s", t);
