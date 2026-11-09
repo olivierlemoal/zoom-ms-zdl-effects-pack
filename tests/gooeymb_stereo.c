@@ -46,9 +46,9 @@ int main(void)
     params[0] = 1.0f;
 
     params[GOOEYMB_LOTHR_SLOT] = 1.00f;                                /* -30 dB */
-    params[GOOEYMB_RELS_SLOT] = 0.03f;                                 /* 1.2 s: makeup stays behind */
-    play(1500, 0.5f, &pl, &pr);
-    printf("LoThr -30: gain L %.4f R %.4f (linked, under 1)\n", pl / 0.5f, pr / 0.2f);
-    if (!(pl / 0.5f < 0.5f && fabsf(pl / 0.5f - pr / 0.2f) < 0.01f)) { puts("FAIL: stereo link through the entry"); fails++; }
+    params[GOOEYMB_RELS_SLOT] = 0.03f;                                 /* 1.2 s */
+    play(1500, 0.25f, &pl, &pr);                                       /* alone, R (-20 dBFS) would get x3.35 */
+    printf("LoThr -30: gain L %.4f R %.4f (linked)\n", pl / 0.25f, pr / 0.1f);
+    if (!(pr / 0.1f < 2.5f && fabsf(pl / 0.25f - pr / 0.1f) < 0.01f)) { puts("FAIL: stereo link through the entry"); fails++; }
     return fails;
 }
