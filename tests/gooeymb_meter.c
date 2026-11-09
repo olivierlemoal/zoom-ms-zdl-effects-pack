@@ -1,6 +1,6 @@
 /* GooeyMB meter on the cover (src/custom/common/zdl_meter.h): every frame equals the reference render
  * (line at LoThr with its "LO" tag, HiThr in the bottom tag), stays within ZM_CAP, flips A/B, at most
- * 15 redraws a second, nothing on stock firmware or off screen, the level is the output. */
+ * 15 redraws a second, nothing on stock firmware or off screen, the level is the low band before its gain. */
 #define GOOEYMB_HOST_TEST
 #define EFF_NK 9
 #define ZM_EFFECT_C "../src/custom/gooeymb/gooeymb.c"
@@ -14,6 +14,7 @@ static void eff_init(void) { memset(&S, 0x5A, sizeof S); gm_init(&S); }
 static ZmState *eff_zm(void) { return &S.zm; }
 
 static float last_out;                               /* loudest output sample of the last block */
+static float tone = 0.007f;                          /* radians a sample: 0.007 = 49 Hz (low band), 0.05 = 351 Hz (high) */
 static void eff_block(const float *u, float amp, int b)
 {
     float buf[16];
@@ -23,7 +24,7 @@ static void eff_block(const float *u, float amp, int b)
     for (i = 0; i < 8; i++) {
         float t = (float)(b * 8 + i), a = amp;
         if (amp < 0.0f) { float ph = fmodf(t, 22050.0f); a = -amp * expf(-ph / 3000.0f); }
-        buf[i] = a * sinf(0.05f * t); buf[i + 8] = buf[i];
+        buf[i] = a * sinf(tone * t); buf[i + 8] = buf[i];
     }
     gm_prepare(&P, &S, u);
     on = zm_begin(&S.zm, (void *)&S);
@@ -48,22 +49,34 @@ static void eff_line(const float *u, double *line, double *rpd) { *line = (u[0] 
 int main(void)
 {
     static const float udef[EFF_NK] = { 400.0f, 400.0f, 9.0f, 1.0f, 2.0f, 1.0f, 4.0f, 4.0f, 100.0f };
-    float u[EFF_NK], pk;
-    int g, b, r, w;
+    float u[EFF_NK], pk, shown;
+    int g, b;
 
     zmt_run(udef);
 
-    /* the shown level is the output after the gains; with Mix 0 the summed bands */
-    for (g = 0; g < 2; g++) {
+    /* the shown level is the low band before its gain: the same at any LoThr and makeup, and at Mix 0 */
+    for (g = 0; g < 3; g++) {
         zmt_reset(1u, 1u);
-        memcpy(u, udef, sizeof u); u[0] = 200.0f; u[1] = 200.0f;
-        if (g) u[8] = 0.0f;
-        for (b = 0; b < 5512; b++) eff_block(u, 0.5f, b);
+        memcpy(u, udef, sizeof u); u[0] = g == 1 ? 0.0f : 200.0f; u[1] = 200.0f;
+        if (g == 2) u[8] = 0.0f;
+        tone = 0.007f;
+        for (b = 0; b < 5512 + 2000; b++) eff_block(u, 0.1f, b);          /* -20 dBFS: the output is ~10 dB louder */
+        shown = ZM_DB0 - (float)S.zm.lv[(S.zm.head - 1u) & 255u] / 16.0f;
+        CHECK(fabsf(shown + 20.0f) < 0.5f, "%s: 49 Hz at -20 dBFS shown at %.2f dB",
+              g == 0 ? "LoThr -20" : g == 1 ? "LoThr -40" : "Mix 0", shown);
+    }
+
+    /* a high note shows far under its output: the high band is not on this meter */
+    {
+        zmt_reset(1u, 1u);
+        memcpy(u, udef, sizeof u); u[0] = 200.0f;
+        tone = 0.05f;
         pk = 0.0f;
-        for (b = 5512; b < 5512 + 2000; b++) { eff_block(u, 0.5f, b); pk = last_out > pk ? last_out : pk; }
-        r = (int)zm_row(&S.zm, S.zm.lv[(S.zm.head - 1u) & 255u]);
-        w = ref_row(u, 20.0 * log10(pk));
-        CHECK(r >= w - 1 && r <= w + 1, "%s: row %d, output peak %.3f wants %d", g ? "Mix 0" : "Thr -20", r, pk, w);
+        for (b = 0; b < 5512 + 2000; b++) { eff_block(u, 0.5f, b); if (b >= 5512) pk = last_out > pk ? last_out : pk; }
+        shown = ZM_DB0 - (float)S.zm.lv[(S.zm.head - 1u) & 255u] / 16.0f;
+        printf("351 Hz: output %.1f dB, meter %.1f dB\n", 20.0 * log10(pk), shown);
+        CHECK(shown < 20.0f * log10f(pk) - 20.0f, "351 Hz: meter %.1f dB, output %.1f dB", shown, 20.0 * log10(pk));
+        tone = 0.007f;
     }
 
     {

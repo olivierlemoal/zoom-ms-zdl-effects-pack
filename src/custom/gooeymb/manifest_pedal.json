@@ -5,7 +5,7 @@
   "gid_comment": "0x08 = Delay category -> Fx_DLY_. Grouped under DLY with the rest of the pack.",
   "fxid": 947,
   "fxid_comment": "947: free in every gid across the known collections (themanro/ZoomMultistompZDL docs/FXID-REGISTRY.md, 'Next available fxid', checked 2026-10-29). Pack IDs: 480 DualShft, 481 LOUDER, 485 DubSiren, 486 Choral, 487 WaveFold, 488 EuGate, 489 S.GN_L, 490 Scrub, 491 DirtBox, 492 Washout, 493 Breather, 494 Takeoff, 495 GRDELAY, 496 Sweep, 497 Looper, 501 Gooey, 502 DJFilter.",
-  "fxid_version": "1.01",
+  "fxid_version": "1.02",
   "flags_byte": 1,
   "params": [
     {"name": "LoThr", "max": 400, "default": 400,
@@ -15,7 +15,7 @@
     {"name": "XOver", "max": 20, "default": 9,
      "comment": "Crossover, 0..20 = 60 to 400 Hz on a log scale (Linkwitz-Riley 24 dB/oct). Default 9 = 141 Hz."},
     {"name": "Zoom", "max": 15, "default": 1,
-     "comment": "Meter zoom (the live cover; no effect on the sound): 0..15 = x0.5 to x8.0 rows a dB around the LoThr line, which stays mid-meter. Default x1.0."},
+     "comment": "Meter zoom (the live cover; no effect on the sound): 0..15 = x0.5 to x8.0 rows a dB around the LoThr line, which stays mid-meter. The meter shows the low band before its gain. Default x1.0."},
     {"name": "LoRat", "max": 3, "default": 2,
      "comment": "Low band ratio: 0 1.5:1, 1 2:1, 2 4:1, 3 10:1. Default 4:1."},
     {"name": "HiRat", "max": 3, "default": 1,

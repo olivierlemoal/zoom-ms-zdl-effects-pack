@@ -32,9 +32,10 @@
  *   Mix is applied per band (dry + wet x gain), so the dry part is the same summed bands and
  *   Mix never combs against the crossover's phase.
  *
- * METER: Gooey's live cover (src/custom/common/zdl_meter.h): the output level, the line at
- * LoThr (tag "LO"), the HiThr value in a second tag at the bottom. The tag font has no O: the
- * zero glyph draws it.
+ * METER: Gooey's live cover (src/custom/common/zdl_meter.h): the low band's level before its gain
+ * (what the low detector sees), the line at LoThr (tag "LO"), so what pokes over the line is what
+ * the low band compresses; the HiThr value in a second tag at the bottom. The output level would
+ * sit over the line by the makeup. The tag font has no O: the zero glyph draws it.
  *
  * Pedal-safe rules (docs/SAFE-DSP-RULES.md): no static arrays in .audio, no divide, no libm,
  * no switch, no double, helpers forced inline, state in the arena with a magic.
@@ -254,7 +255,7 @@ static inline void gm_prepare(GmParams *P, GmState *s, const float *u)
 
 /* ---- meter ------------------------------------------------------------------------- */
 GM_ALWAYS_INLINE(gm_meter_level)
-static inline void gm_meter_level(GmState *s, const float *buf)
+static inline void gm_meter_level(GmState *s, const float *buf)   /* buf: one band, L 0..7, R 8..15 */
 {
     int i;
     float m = s->zm.lvl;
@@ -322,6 +323,7 @@ static inline void gm_process(GmState *s, const GmParams *P, float *restrict buf
         }
         f[0] = p1; f[1] = p2; f[2] = q1; f[3] = q2; f[4] = r1; f[5] = r2;
     }
+    if (s->zm.on) gm_meter_level(s, lo);        /* the meter shows the low band before its gain */
 
     /* 2. per band: detector, gain computer, ballistics, makeup -> the band's gain for the block */
     for (b = 0; b < 2; b++) {
@@ -375,8 +377,6 @@ static inline void gm_process(GmState *s, const GmParams *P, float *restrict buf
         buf[i + 8] = yr * lg;
     }
     s->lg = lg;
-
-    if (s->zm.on) gm_meter_level(s, buf);
 }
 
 /* ---- on-screen text ------------------------------------------------------ */
