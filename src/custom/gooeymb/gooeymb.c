@@ -24,8 +24,11 @@
  *   1 - 1/ratio, attack / release one-poles in the log domain, AUTO release with a slow stage.
  *   The low band's detector is slower (peak fall 150 ms, RMS 20 ms instead of 50 / 5) so the
  *   gain does not follow the cycles of a low note (that would distort it).
- *   Makeup is always AUTO per band (adds back that band's 1 s average reduction), so each band
- *   keeps its average level and the tone balance stays where it was.
+ *   Makeup is a fixed AUTO per band, from its threshold and ratio: the reduction a -6 dBFS level
+ *   would get. No time behaviour, so a held note keeps its reduction and quiet notes after a loud
+ *   passage are not pushed up; the tone balance stays where it was. The makeup also lifts a
+ *   note's attack before the detector catches it, so the output has a -1 dBFS ceiling (instant
+ *   attack, 50 ms release) that only acts on those attacks.
  *   Mix is applied per band (dry + wet x gain), so the dry part is the same summed bands and
  *   Mix never combs against the crossover's phase.
  *
@@ -51,13 +54,15 @@
 #define GM_BLOCK_LOOP()
 #endif
 
-#define GM_MAGIC     0x474D4231u            /* "GMB1": change when GmState changes */
+#define GM_MAGIC     0x474D4232u            /* "GMB2": change when GmState changes */
 #define GM_KEY_NONE  0xFFFFFFFFu
 #define GM_DPK       0.99638f               /* high band peak follower fall per block: 50 ms */
 #define GM_CMS       0.03563f               /* high band mean-square follower per block: 5 ms */
 #define GM_DPK_LO    0.998791f              /* low band: 150 ms, so a low note does not ripple the gain */
 #define GM_CMS_LO    0.009029f              /* low band: 20 ms                              */
-#define GM_CAV       0.0001814f             /* AUTO makeup average per block: 1 s          */
+#define GM_MK_REF    -0.99657840f           /* AUTO makeup reference level: -6 dBFS in log2 units */
+#define GM_CEIL      0.89125094f            /* output ceiling: -1 dBFS                      */
+#define GM_LREL      4.5341e-4f             /* ceiling release per sample: 50 ms            */
 #define GM_CSLOW     0.00015117f            /* AUTO slow stage per block: 1.2 s            */
 #define GM_KNEE_H    0.49829f               /* half the 6 dB knee, in log2 units (1 = 6.02 dB) */
 #define GM_KNEE_K    0.50172f               /* 1 / (2 x knee width)                        */
@@ -83,7 +88,8 @@ typedef struct {
     unsigned int was_off;
     unsigned int k_att, k_rel, k_xo;        /* knob values the cached numbers are for */
     float cA, cR, a1, a2, a3;               /* ballistics; crossover filter coefficients */
-    float pkenv[2], ms[2], rS[2], rF[2], avg[2], gm[2];   /* per band: 0 low, 1 high */
+    float pkenv[2], ms[2], rS[2], rF[2], gm[2];   /* per band: 0 low, 1 high */
+    float lg;                               /* output ceiling gain */
     float xf[12];                           /* crossover states: per side split, low, high (2 each) */
     ZmState zm;                             /* the cover meter */
     unsigned int seal[ZA_NSEAL(240)];       /* every word's bits 30, 29 between blocks (zarena.h) */
@@ -93,7 +99,7 @@ ZA_CHECK(GmState);
 #define GM_HDR ((int)(offsetof(GmState, zm.lv) >> 2))
 
 typedef struct {
-    float t2[2], slope[2], dryG, wetG, cA, cR, a1, a2, a3;
+    float t2[2], slope[2], mk[2], dryG, wetG, cA, cR, a1, a2, a3;
     unsigned int off[2], autor;
 } GmParams;
 
@@ -180,7 +186,8 @@ GM_ALWAYS_INLINE(gm_reset)
 static inline void gm_reset(GmState *s)
 {
     int i;
-    for (i = 0; i < 2; i++) { s->pkenv[i] = 0.0f; s->ms[i] = 0.0f; s->rS[i] = 0.0f; s->rF[i] = 0.0f; s->avg[i] = 0.0f; s->gm[i] = 1.0f; }
+    for (i = 0; i < 2; i++) { s->pkenv[i] = 0.0f; s->ms[i] = 0.0f; s->rS[i] = 0.0f; s->rF[i] = 0.0f; s->gm[i] = 1.0f; }
+    s->lg = 1.0f;
     for (i = 0; i < 12; i++) s->xf[i] = 0.0f;
 }
 
@@ -231,9 +238,12 @@ static inline void gm_prepare(GmParams *P, GmState *s, const float *u)
     }
     for (b = 0; b < 2; b++) {
         unsigned int thr = (unsigned int)(int)u[b];
+        float over;
         P->off[b] = (thr >= 400u);
         P->t2[b] = ((float)(int)thr - 400.0f) * (0.1f * GM_DB2LOG);
         P->slope[b] = gm_slope((unsigned int)(int)u[4 + b]);
+        over = GM_MK_REF - P->t2[b];
+        P->mk[b] = (P->off[b] || over <= 0.0f) ? 0.0f : P->slope[b] * over;
     }
     P->dryG = 1.0f - m;
     P->wetG = m;
@@ -289,7 +299,7 @@ static inline void gm_meter(GmState *s, const float *u)
 GM_ALWAYS_INLINE(gm_process)
 static inline void gm_process(GmState *s, const GmParams *P, float *restrict buf)
 {
-    float lo[16], hi[16], gt[2], g0, g1, s0, s1;
+    float lo[16], hi[16], gt[2], g0, g1, s0, s1, lg;
     int i, c, b;
 
     /* 1. split each side: LR4 low = LP(LP(x)), high = HP(HP(x)), three TPT SVFs (Simper) */
@@ -342,20 +352,29 @@ static inline void gm_process(GmState *s, const GmParams *P, float *restrict buf
         if (rS < 1e-7f) rS = 0.0f;
         s->rS[b] = rS; s->rF[b] = rF;
         tot = rS + rF;
-        s->avg[b] += GM_CAV * (tot - s->avg[b]);
-        if (s->avg[b] < 1e-7f) s->avg[b] = 0.0f;
-        gt[b] = P->dryG + P->wetG * gm_exp2(s->avg[b] - tot);
+        gt[b] = P->dryG + P->wetG * gm_exp2(P->mk[b] - tot);
     }
 
-    /* 3. sum the bands, each gain moved in a line over the block (no zipper) */
+    /* 3. sum the bands, each gain moved in a line over the block (no zipper); the makeup lifts a note's
+     *    attack before the detector catches it, so a ceiling with instant attack holds it at -1 dBFS */
     g0 = s->gm[0]; s0 = (gt[0] - g0) * 0.125f; s->gm[0] = gt[0];
     g1 = s->gm[1]; s1 = (gt[1] - g1) * 0.125f; s->gm[1] = gt[1];
+    lg = s->lg;
     GM_BLOCK_LOOP()
     for (i = 0; i < 8; i++) {
+        float yl, yr, p, q;
         g0 += s0; g1 += s1;
-        buf[i] = g0 * lo[i] + g1 * hi[i];
-        buf[i + 8] = g0 * lo[i + 8] + g1 * hi[i + 8];
+        yl = g0 * lo[i] + g1 * hi[i];
+        yr = g0 * lo[i + 8] + g1 * hi[i + 8];
+        p = (yl < 0.0f) ? -yl : yl;
+        q = (yr < 0.0f) ? -yr : yr;
+        p = (q > p) ? q : p;
+        lg += GM_LREL * (1.0f - lg);
+        if (p * lg > GM_CEIL) lg = GM_CEIL * gm_exp2(-gm_log2(p));
+        buf[i] = yl * lg;
+        buf[i + 8] = yr * lg;
     }
+    s->lg = lg;
 
     if (s->zm.on) gm_meter_level(s, buf);
 }

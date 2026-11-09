@@ -134,15 +134,49 @@ int main(void)
         CHECK(db(f1 / f3) > 60.0f, "gain ripple on a low note: 3rd harmonic only %.1f dB down", db(f1 / f3));
     }
 
-    /* ---- 4. AUTO makeup per band: after a long note each band is back near its level ---- */
+    /* ---- 4. AUTO makeup is fixed: a -6 dBFS note comes out at its level, a held note does not swell,
+     *         and a quiet note after a loud passage is not pushed above its own steady level ---- */
     {
-        K k = kd(); float g;
-        k.lo = 100; k.att = 2; k.rel = 3;
-        sine(inL, SR * 10, 50.0f, 0.5f); memcpy(inR, inL, sizeof(float) * SR * 10);
-        run(SR * 10, k);
-        g = db(peak(outL, SR * 10 - 4000, SR * 10) / 0.5f);
-        printf("AUTO makeup after 10 s of 50 Hz: %.2f dB\n", g);
-        CHECK(fabsf(g) < 1.0f, "AUTO makeup off by %.2f dB", g);
+        const float f = (float)SR / 882.0f;                  /* 50 Hz: whole periods in the window */
+        const int on = SR, cut = SR * 4, n = SR * 8;
+        K k = kd(); float g, early, late, quiet, worst = -100.0f;
+        int j;
+        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1, default 10 ms / AUTO */
+        sine(inL, SR * 2, f, 0.5f); memcpy(inR, inL, sizeof(float) * SR * 2);
+        run(SR * 2, k);
+        g = db(amp_at(outL, SR, SR + 882 * 20, f) / 0.5f);
+        printf("AUTO makeup: a -6 dBFS 50 Hz note comes out at %+.2f dB\n", g);
+        CHECK(fabsf(g) < 1.0f, "AUTO makeup off by %.2f dB at -6 dBFS", g);
+        for (i = 0; i < n; i++) {
+            float a = i < on ? 0.0f : i < cut ? 0.7f : 0.007f;
+            inL[i] = inR[i] = a * sinf(6.2831853f * f * (float)i / (float)SR);
+        }
+        run(n, k);
+        early = db(amp_at(outL, on + 882 * 25, on + 882 * 27, f) / 0.7f);         /* 0.5 s into the note */
+        late = db(amp_at(outL, cut - 882 * 3, cut - 882, f) / 0.7f);              /* 3 s into the note */
+        quiet = db(amp_at(outL, n - 882 * 3, n - 882, f) / 0.007f);                /* 4 s after it: steady */
+        for (j = 0; j < 12; j++) {                                                 /* 0.25 .. 3 s after it */
+            int a = cut + 882 * 12 + j * 882 * 12;
+            float d = db(amp_at(outL, a, a + 882 * 2, f) / 0.007f);
+            if (d > worst) worst = d;
+        }
+        printf("held loud note: %+.2f dB at 0.5 s, %+.2f at 3 s; quiet note after it: worst %+.2f dB, steady %+.2f\n",
+               early, late, worst, quiet);
+        CHECK(fabsf(late - early) < 1.0f, "a held note swells: %+.2f dB at 0.5 s, %+.2f at 3 s", early, late);
+        CHECK(worst < quiet + 0.5f, "quiet note pushed up after a loud one: %+.2f dB vs %+.2f steady", worst, quiet);
+    }
+
+    /* ---- 4b. a loud note after silence: the makeup lifts its attack, the ceiling holds it at -1 dBFS ---- */
+    {
+        const int on = SR / 2;
+        K k = kd(); float pk, settled;
+        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1, makeup +18 dB, attack 10 ms */
+        for (i = 0; i < SR; i++) inL[i] = inR[i] = i < on ? 0.0f : 0.7f * sinf(6.2831853f * 50.0f * (float)(i - on) / (float)SR);
+        run(SR, k);
+        pk = db(peak(outL, on, on + SR / 20)); settled = db(peak(outL, SR - 4000, SR));
+        printf("-3 dBFS note after silence: attack peak %+.2f dBFS, settled %+.2f dBFS\n", pk, settled);
+        CHECK(pk < -0.99f, "attack over the -1 dBFS ceiling: %+.2f dBFS", pk);
+        CHECK(settled < -3.0f, "the settled note stays at the ceiling: %+.2f dBFS", settled);
     }
 
     /* ---- 5. Mix per band: 0 = the bands uncompressed, 50 = halfway in gain ---- */
@@ -159,15 +193,16 @@ int main(void)
         CHECK(fabsf(o50 - (0.5f + 0.5f * g)) < 0.02f, "Mix 50 %.3f vs %.3f", o50, 0.5f + 0.5f * g);
     }
 
-    /* ---- 6. linked stereo: both sides get one gain, from the louder side ---- */
+    /* ---- 6. linked stereo: both sides get one gain, from the louder side (alone, the quiet side
+     *         would sit under LoThr and get the whole makeup, about x7.9) ---- */
     {
         K k = kd(); float gl, gr;
         k.lo = 100; k.att = 2; k.rel = 3;
-        sine(inL, SR, 50.0f, 0.5f); sine(inR, SR, 50.0f, 0.02f);
+        sine(inL, SR, 50.0f, 0.25f); sine(inR, SR, 50.0f, 0.02f);
         run(SR, k);
-        gl = peak(outL, SR - 4000, SR) / 0.5f; gr = peak(outR, SR - 4000, SR) / 0.02f;
+        gl = peak(outL, SR - 4000, SR) / 0.25f; gr = peak(outR, SR - 4000, SR) / 0.02f;
         printf("linked: gain L %.4f, R %.4f\n", gl, gr);
-        CHECK(fabsf(gl - gr) < 0.01f && gl < 0.5f, "L gain %.4f vs R gain %.4f", gl, gr);
+        CHECK(fabsf(gl - gr) < 0.01f && gr < 3.0f, "L gain %.4f vs R gain %.4f", gl, gr);
     }
 
     /* ---- 7. no clicks, no NaN: fastest attack 10:1, and the crossover swept while playing ---- */
@@ -182,11 +217,14 @@ int main(void)
         run(SR * 2, k);
         for (i = 100; i < SR * 2; i++) {             /* 632 Hz is all high band: out / ref is its gain */
             if (!(fabsf(outL[i]) < 4.0f) || !(fabsf(outR[i]) < 4.0f)) bad++;
-            if (fabsf(refL[i]) > 0.2f) { gs = outL[i] / refL[i]; if (gp > 0.0f && fabsf(gs - gp) > mx) mx = fabsf(gs - gp); gp = gs; }
+            if (fabsf(outL[i]) > 0.8922f || fabsf(outR[i]) > 0.8922f) bad++;      /* the -1 dBFS ceiling */
+            /* while the ceiling holds the attack of a loud note (here +30 dB of makeup against 0.1 ms
+             * attack), it steps the gain at each new peak: skip the first 512 samples (12 ms) */
+            if (fabsf(refL[i]) > 0.2f && i % 6000 >= 512) { gs = outL[i] / refL[i]; if (gp > 0.0f && fabsf(gs - gp) > mx) mx = fabsf(gs - gp); gp = gs; }
             else gp = -1.0f;
         }
         printf("fastest attack, 10:1: largest gain step per sample %.3f, bad samples %d\n", mx, bad);
-        CHECK(bad == 0 && mx < 0.16f, "clicks or NaN: step %.3f, %d bad", mx, bad);
+        CHECK(bad == 0 && mx < 0.16f, "clicks, NaN or over the ceiling: step %.3f, %d bad", mx, bad);
         /* crossover 60 -> 400 Hz in the middle of a loud bass note with noise on top */
         for (i = 0; i < SR * 2; i++) { inL[i] = 0.8f * sinf(6.2831853f * 70.0f * i / SR) + 0.1f * rnd(); inR[i] = inL[i]; }
         k = kd(); k.lo = 200; k.hi = 250; k.xo = 0; k2 = k; k2.xo = 20;
