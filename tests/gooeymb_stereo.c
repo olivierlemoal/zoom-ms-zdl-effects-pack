@@ -32,7 +32,7 @@ int main(void)
     int fails = 0, i;
     float pl, pr, off = 0;
     se_init(65536);
-    D(LOTHR); D(HITHR); D(ZOOM); D(XOVER); D(LORAT); D(HIRAT); D(ATTCK); D(RELS); D(MIX);
+    D(LOTHR); D(HITHR); D(LEVEL); D(XOVER); D(LORAT); D(HIRAT); D(ATTCK); D(RELS); D(MIX);
 
     play(3000, 0.5f, &pl, &pr);
     printf("defaults: L %.4f R %.4f (0.5, 0.2)\n", pl, pr);

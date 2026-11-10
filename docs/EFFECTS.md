@@ -316,7 +316,7 @@ Try: Thrsh -12, Ratio 2, Attck 30 ms, Rels AUTO, MkUp AUTO, SC HP 100 Hz on a fu
 ### GooeyMB: Gooey in two bands, for bass
 
 <img src="../graphics/gooeymb.png" width="320" alt="GooeyMB on the pedal screen">
-Stereo in and out. Not pedal-tested yet.
+Stereo in and out. Tested on a stock MS-50G 3.10.
 
 Gooey's compressor split in a low and a high band, so a loud low note is held on its own and does not pull down the attack and the harmonics above it. A Linkwitz-Riley 24 dB/oct crossover splits the sound; the two bands sum back flat in level (with a phase turn around the crossover, so even with both bands OFF the output is not bit-exact). Each band has Gooey's detector, soft knee and ballistics, one gain for both sides; the low band's detector is slower (peak fall 150 ms, RMS 20 ms) so the gain does not follow the cycles of a low note. Makeup is a fixed AUTO per band, set by its threshold and ratio: a note at -6 dBFS comes out at its level, quieter notes come up. It does not move with time, so a held note does not swell and quiet notes after a loud passage are not pushed up. The makeup lifts the attack of a note until the detector catches it, so the output has a -1 dBFS ceiling (instant attack, 50 ms release) that holds those attacks.
 
@@ -325,7 +325,7 @@ Gooey's compressor split in a low and a high band, so a loud low note is held on
 | LoThr | -40 .. 0 dB | Low band threshold in 0.1 dB steps. 0 = OFF (that band is not compressed). Default 0. |
 | HiThr | -40 .. 0 dB | High band threshold, same scale. Default 0. |
 | XOver | 60 .. 400 Hz | Crossover between the bands, log steps. Default 141 Hz. |
-| Zoom | x0.5 .. x8.0 | Meter only: rows a dB, scaled around the LoThr line. Default x1. |
+| Level | -24 .. +6 dB | Output level, dry and wet alike, before the -1 dBFS ceiling. The makeup brings what you play towards -6 dBFS, so a soft player gets much louder: turn Level down until on and off sound as loud. No change to the compression. Default 0 dB. |
 | LoRat | 1.5, 2, 4, 10 | Low band ratio. Default 4. |
 | HiRat | 1.5, 2, 4, 10 | High band ratio. Default 2. |
 | Attck | 0.1, 0.3, 1, 3, 10, 30 ms | Both bands. Default 10 ms. |
