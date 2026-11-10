@@ -20,9 +20,9 @@ static int fails;
 static float inL[MAXN], inR[MAXN], outL[MAXN], outR[MAXN], refL[MAXN];
 static GmState S;
 
-/* screen values: LoThr, HiThr, XOver, Zoom, LoRat, HiRat, Attck, Rels, Mix */
-typedef struct { float lo, hi, xo, lr, hr, att, rel, mix; } K;
-static K kd(void) { K k = { 400, 400, 9, 2, 1, 4, 4, 100 }; return k; }
+/* screen values: LoThr, HiThr, XOver, Level, LoRat, HiRat, Attck, Rels, Mix */
+typedef struct { float lo, hi, xo, lr, hr, att, rel, mix, lv; } K;
+static K kd(void) { K k = { 400, 400, 9, 2, 1, 4, 4, 100, 24 }; return k; }
 
 static void run_from(int n, K k, int from_block, K k2)
 {
@@ -31,7 +31,7 @@ static void run_from(int n, K k, int from_block, K k2)
     for (b = 0; b < n / 8; b++) {
         float buf[16];
         K c = (b < from_block) ? k : k2;
-        u[0] = c.lo; u[1] = c.hi; u[2] = c.xo; u[3] = 1; u[4] = c.lr; u[5] = c.hr; u[6] = c.att; u[7] = c.rel; u[8] = c.mix;
+        u[0] = c.lo; u[1] = c.hi; u[2] = c.xo; u[3] = c.lv; u[4] = c.lr; u[5] = c.hr; u[6] = c.att; u[7] = c.rel; u[8] = c.mix;
         for (i = 0; i < 8; i++) { buf[i] = inL[b * 8 + i]; buf[i + 8] = inR[b * 8 + i]; }
         gm_prepare(&P, &S, u);
         gm_process(&S, &P, buf);
@@ -179,6 +179,19 @@ int main(void)
         CHECK(settled < -3.0f, "the settled note stays at the ceiling: %+.2f dBFS", settled);
     }
 
+    /* ---- 4c. Level is a plain output level: -12 dB on the output, the same gain reduction ---- */
+    {
+        K k = kd(); float a, b, gra, grb;
+        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1 */
+        sine(inL, SR * 2, 50.0f, 0.25f); memcpy(inR, inL, sizeof(float) * SR * 2);
+        run(SR * 2, k); a = peak(outL, SR, SR * 2); gra = (S.rS[0] + S.rF[0]) * 6.0206f;
+        k.lv = 12;                                            /* -12 dB */
+        run(SR * 2, k); b = peak(outL, SR, SR * 2); grb = (S.rS[0] + S.rF[0]) * 6.0206f;
+        printf("Level -12: output %+.2f dB, gain reduction %.2f -> %.2f dB\n", db(b / a), gra, grb);
+        CHECK(fabsf(db(b / a) + 12.0f) < 0.1f, "Level -12 moved the output %+.2f dB", db(b / a));
+        CHECK(fabsf(gra - grb) < 0.01f, "Level changed the compression: %.2f vs %.2f dB", gra, grb);
+    }
+
     /* ---- 5. Mix per band: 0 = the bands uncompressed, 50 = halfway in gain ---- */
     {
         K k = kd(); float g, o50, d = 0, ref[SR / 8];
@@ -244,7 +257,9 @@ int main(void)
         ZDL_GetLabel_2(0, t);  CHECK(!strcmp(t, "60Hz"), "XOver 0 label %s", t);
         ZDL_GetLabel_2(9, t);  CHECK(!strcmp(t, "141Hz"), "XOver 9 label %s", t);
         ZDL_GetLabel_2(20, t); CHECK(!strcmp(t, "400Hz"), "XOver 20 label %s", t);
-        ZDL_GetLabel_3(1, t);  CHECK(!strcmp(t, "x1.0"), "Zoom 1 label %s", t);
+        ZDL_GetLabel_3(0, t);  CHECK(!strcmp(t, "-24dB"), "Level 0 label %s", t);
+        ZDL_GetLabel_3(24, t); CHECK(!strcmp(t, "0dB"), "Level 24 label %s", t);
+        ZDL_GetLabel_3(30, t); CHECK(!strcmp(t, "+6dB"), "Level 30 label %s", t);
         ZDL_GetLabel_0(400, t); CHECK(!strcmp(t, "0"), "LoThr 400 label %s", t);
         ZDL_GetLabel_1(225, t); CHECK(!strcmp(t, "-17.5"), "HiThr 225 label %s", t);
         ZDL_GetLabel_4(0, t);  CHECK(!strcmp(t, "1.5:1"), "LoRat 0 label %s", t);

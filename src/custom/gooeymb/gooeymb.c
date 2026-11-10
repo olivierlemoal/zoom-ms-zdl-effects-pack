@@ -8,7 +8,7 @@
  *   0 LoThr 0..400  low band threshold, -40 .. 0 dB in 0.1 dB steps (400 = 0 dB = OFF: that band is not compressed)
  *   1 HiThr 0..400  high band threshold, same scale (default OFF)
  *   2 XOver 0..20   crossover 60 .. 400 Hz on a log scale (default 9 = 141 Hz)
- *   3 Zoom  0..15   meter only: x0.5 .. x8.0 rows a dB around the LoThr line
+ *   3 Level 0..30   output level -24 .. +6 dB in 1 dB steps (default 24 = 0 dB), on the whole output
  *   4 LoRat 0..3    low band ratio 1.5 / 2 / 4 / 10 (default 2 = 4:1)
  *   5 HiRat 0..3    high band ratio (default 1 = 2:1)
  *   6 Attck 0..5    0.1 / 0.3 / 1 / 3 / 10 / 30 ms, both bands (default 4 = 10 ms)
@@ -221,7 +221,7 @@ static inline float gm_slope(unsigned int r)
     return (r == 0u) ? 0.33333333f : (r == 1u) ? 0.5f : (r == 2u) ? 0.75f : 0.9f;
 }
 
-/* u[] = screen values in manifest order: LoThr, HiThr, XOver, Zoom, LoRat, HiRat, Attck, Rels, Mix.
+/* u[] = screen values in manifest order: LoThr, HiThr, XOver, Level, LoRat, HiRat, Attck, Rels, Mix.
  * The cached numbers are only recomputed when their knob moved. */
 GM_ALWAYS_INLINE(gm_prepare)
 static inline void gm_prepare(GmParams *P, GmState *s, const float *u)
@@ -246,8 +246,11 @@ static inline void gm_prepare(GmParams *P, GmState *s, const float *u)
         over = GM_MK_REF - P->t2[b];
         P->mk[b] = (P->off[b] || over <= 0.0f) ? 0.0f : P->slope[b] * over;
     }
-    P->dryG = 1.0f - m;
-    P->wetG = m;
+    {   /* Level -24 .. +6 dB scales dry and wet alike, so it is a plain output level: no change to the compression */
+        float lv = gm_exp2(((float)(int)u[3] - 24.0f) * GM_DB2LOG);
+        P->dryG = (1.0f - m) * lv;
+        P->wetG = m * lv;
+    }
     P->cA = s->cA; P->cR = s->cR;
     P->a1 = s->a1; P->a2 = s->a2; P->a3 = s->a3;
     P->autor = (kr >= 4u);
@@ -278,17 +281,17 @@ static inline unsigned int gm_tag_text(char *t, char a, char b, unsigned int thr
     return zm_tenths(400u - thr, t, thr < 400u ? 4u : 3u);
 }
 
-/* once per on-screen block: history column; line, zoom and tags for LoThr/HiThr/Zoom; frame */
+/* once per on-screen block: history column; line and tags for LoThr/HiThr; frame (zoom x1: the knob is Level) */
 GM_ALWAYS_INLINE(gm_meter)
 static inline void gm_meter(GmState *s, const float *u)
 {
     ZmState *z = &s->zm;
-    unsigned int lo = (unsigned int)(int)u[0], hi = (unsigned int)(int)u[1], zo = (unsigned int)(int)u[3];
-    unsigned int key = lo | (hi << 9) | (zo << 18);
+    unsigned int lo = (unsigned int)(int)u[0], hi = (unsigned int)(int)u[1];
+    unsigned int key = lo | (hi << 9);
     if (zm_column(z)) zm_push(z);
     if (key != z->key && z->pos >= ZM_RAW) {
         char t[12];
-        zm_scale(z, ((float)(int)lo - 400.0f) * 0.1f, (float)(int)(zo + 1u) * 0.5f);
+        zm_scale(z, ((float)(int)lo - 400.0f) * 0.1f, 1.0f);
         z->key = key; z->dirty = 1u;
         zm_tag_set(&z->tag[0], t, gm_tag_text(t, 'L', '0', lo), 126u, ZM_MID - 2u);
         zm_tag_set(&z->tag[1], t, gm_tag_text(t, 'H', 'I', hi), 126u, 62u);
@@ -444,12 +447,17 @@ int ZDL_GetLabel_2(unsigned int value, char *out)
     return n;
 }
 
-/* knob 3 Zoom: x0.5 .. x8.0 (meter rows a dB) */
+/* knob 3 Level: -24 .. +6 dB */
 int ZDL_GetLabel_3(unsigned int value, char *out)
 {
-    if (value > 15u) value = 15u;
-    out[0] = 'x';
-    return gm_tenths_text((value + 1u) * 5u, out, 1);
+    int n = 0, d;
+    if (value > 30u) value = 30u;
+    d = (int)value - 24;
+    if (d < 0) { out[0] = '-'; d = -d; n = 1; }
+    else if (d > 0) { out[0] = '+'; n = 1; }
+    n = gm_int_text(d, out, n);
+    out[n++] = 'd'; out[n++] = 'B'; out[n] = 0;
+    return n;
 }
 
 int ZDL_GetLabel_4(unsigned int value, char *out) { return gm_ratio_label(value, out); }
@@ -526,7 +534,7 @@ void GOOEYMB_AUDIO_FUNC(unsigned int *ctx)
     u[0] = gm_ui_thr(params[GOOEYMB_LOTHR_SLOT], (float)GOOEYMB_LOTHR_UI_DEFAULT);
     u[1] = gm_ui_thr(params[GOOEYMB_HITHR_SLOT], (float)GOOEYMB_HITHR_UI_DEFAULT);
     u[2] = gm_ui(params[GOOEYMB_XOVER_SLOT], (float)GOOEYMB_XOVER_UI_DEFAULT, 20.0f);
-    u[3] = gm_ui(params[GOOEYMB_ZOOM_SLOT],  (float)GOOEYMB_ZOOM_UI_DEFAULT,  15.0f);
+    u[3] = gm_ui(params[GOOEYMB_LEVEL_SLOT], (float)GOOEYMB_LEVEL_UI_DEFAULT, 30.0f);
     u[4] = gm_ui(params[GOOEYMB_LORAT_SLOT], (float)GOOEYMB_LORAT_UI_DEFAULT, 3.0f);
     u[5] = gm_ui(params[GOOEYMB_HIRAT_SLOT], (float)GOOEYMB_HIRAT_UI_DEFAULT, 3.0f);
     u[6] = gm_ui(params[GOOEYMB_ATTCK_SLOT], (float)GOOEYMB_ATTCK_UI_DEFAULT, 5.0f);
