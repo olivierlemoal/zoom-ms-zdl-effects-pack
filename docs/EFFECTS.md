@@ -322,12 +322,12 @@ Gooey's compressor split in a low and a high band, so a loud low note is held on
 
 | Knob | Range | What it does |
 |---|---|---|
-| LoThr | -40 .. 0 dB | Low band threshold in 0.1 dB steps. 0 = OFF (that band is not compressed). Default 0. |
-| HiThr | -40 .. 0 dB | High band threshold, same scale. Default 0. |
+| LoThr | -40 .. 0 dB | Low band threshold in 0.1 dB steps. 0 dB shows OFF: that band is not compressed. Default OFF. |
+| HiThr | -40 .. 0 dB | High band threshold, same scale. Default OFF. |
 | XOver | 60 .. 400 Hz | Crossover between the bands, log steps. Default 141 Hz. |
 | Level | -24 .. +6 dB | Output level, dry and wet alike, before the -1 dBFS ceiling. The makeup brings what you play towards -6 dBFS, so a soft player gets much louder: turn Level down until on and off sound as loud. No change to the compression. Default 0 dB. |
-| LoRat | 1.5, 2, 4, 10 | Low band ratio. Default 4. |
-| HiRat | 1.5, 2, 4, 10 | High band ratio. Default 2. |
+| LoRat | 1.5, 2, 4, 10 | Low band ratio. No effect while LoThr is OFF. Default 4. |
+| HiRat | 1.5, 2, 4, 10 | High band ratio. No effect while HiThr is OFF. Default 2. |
 | Attck | 0.1, 0.3, 1, 3, 10, 30 ms | Both bands. Default 10 ms. |
 | Rels | 0.1, 0.3, 0.6, 1.2 s, AUTO | Both bands; AUTO as in Gooey. Default AUTO. |
 | Mix | 0..100 | Linear dry/wet inside each band (parallel compression); the dry part is the summed bands, so it never combs against the crossover. Default 100. |
