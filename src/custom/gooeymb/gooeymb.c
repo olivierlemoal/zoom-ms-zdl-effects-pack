@@ -413,12 +413,11 @@ static inline int gm_int_text(int n, char *out, int len)
     return len;
 }
 
-/* thresholds: 0..400 -> "-40.0".."0" (dB, 0.1 a step) */
+/* thresholds: 0..400 -> "-40.0".."-0.1", and "OFF" at 400 (0 dB: that band is not compressed) */
 GM_ALWAYS_INLINE(gm_thr_label)
 static inline int gm_thr_label(unsigned int value, char *out)
 {
-    if (value > 400u) value = 400u;
-    if (value == 400u) { out[0] = '0'; out[1] = 0; return 1; }
+    if (value >= 400u) { out[0] = 'O'; out[1] = 'F'; out[2] = 'F'; out[3] = 0; return 3; }
     out[0] = '-';
     return gm_tenths_text(400u - value, out, 1);
 }

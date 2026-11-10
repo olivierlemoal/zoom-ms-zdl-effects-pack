@@ -260,7 +260,8 @@ int main(void)
         ZDL_GetLabel_3(0, t);  CHECK(!strcmp(t, "-24dB"), "Level 0 label %s", t);
         ZDL_GetLabel_3(24, t); CHECK(!strcmp(t, "0dB"), "Level 24 label %s", t);
         ZDL_GetLabel_3(30, t); CHECK(!strcmp(t, "+6dB"), "Level 30 label %s", t);
-        ZDL_GetLabel_0(400, t); CHECK(!strcmp(t, "0"), "LoThr 400 label %s", t);
+        ZDL_GetLabel_0(400, t); CHECK(!strcmp(t, "OFF"), "LoThr 400 label %s", t);
+        ZDL_GetLabel_0(399, t); CHECK(!strcmp(t, "-0.1"), "LoThr 399 label %s", t);
         ZDL_GetLabel_1(225, t); CHECK(!strcmp(t, "-17.5"), "HiThr 225 label %s", t);
         ZDL_GetLabel_4(0, t);  CHECK(!strcmp(t, "1.5:1"), "LoRat 0 label %s", t);
         ZDL_GetLabel_5(3, t);  CHECK(!strcmp(t, "10:1"), "HiRat 3 label %s", t);
