@@ -49,7 +49,7 @@ static void eff_line(const float *u, double *line, double *rpd) { *line = (u[0] 
 
 int main(void)
 {
-    static const float udef[EFF_NK] = { 400.0f, 400.0f, 9.0f, 24.0f, 2.0f, 1.0f, 4.0f, 4.0f, 100.0f };
+    static const float udef[EFF_NK] = { 400.0f, 400.0f, 9.0f, 24.0f, 4.0f, 1.0f, 4.0f, 4.0f, 100.0f };
     float u[EFF_NK], pk, shown;
     int g, b;
 

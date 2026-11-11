@@ -9,8 +9,8 @@
  *   1 HiThr 0..400  high band threshold, same scale (default OFF)
  *   2 XOver 0..20   crossover 60 .. 400 Hz on a log scale (default 9 = 141 Hz)
  *   3 Level 0..30   output level -24 .. +6 dB in 1 dB steps (default 24 = 0 dB), on the whole output
- *   4 LoRat 0..3    low band ratio 1.5 / 2 / 4 / 10 (default 2 = 4:1)
- *   5 HiRat 0..3    high band ratio (default 1 = 2:1)
+ *   4 LoRat 0..7    low band ratio 1.5 / 2 / 2.5 / 3 / 4 / 6 / 8 / 10 (default 4 = 4:1)
+ *   5 HiRat 0..7    high band ratio, same steps (default 1 = 2:1)
  *   6 Attck 0..5    0.1 / 0.3 / 1 / 3 / 10 / 30 ms, both bands (default 4 = 10 ms)
  *   7 Rels  0..4    0.1 / 0.3 / 0.6 / 1.2 s / AUTO, both bands (default 4 = AUTO)
  *   8 Mix   0..100  linear dry/wet inside each band (parallel compression), default 100
@@ -220,10 +220,12 @@ static inline float gm_rel_inv(unsigned int i)
     return (i == 0u) ? 0.01f : (i == 1u) ? 0.0033333333f : (i == 2u) ? 0.0016666667f : (i == 3u) ? 0.00083333333f : 0.01f;
 }
 
+/* slope 1 - 1/ratio of the ratio steps 1.5 / 2 / 2.5 / 3 / 4 / 6 / 8 / 10 */
 GM_ALWAYS_INLINE(gm_slope)
 static inline float gm_slope(unsigned int r)
 {
-    return (r == 0u) ? 0.33333333f : (r == 1u) ? 0.5f : (r == 2u) ? 0.75f : 0.9f;
+    return (r == 0u) ? 0.33333333f : (r == 1u) ? 0.5f : (r == 2u) ? 0.6f : (r == 3u) ? 0.66666667f :
+           (r == 4u) ? 0.75f : (r == 5u) ? 0.83333333f : (r == 6u) ? 0.875f : 0.9f;
 }
 
 /* u[] = screen values in manifest order: LoThr, HiThr, XOver, Level, LoRat, HiRat, Attck, Rels, Mix.
@@ -435,13 +437,13 @@ static inline int gm_thr_label(unsigned int value, char *out)
     return gm_tenths_text(400u - value, out, 1);
 }
 
-/* ratios: 1.5:1 / 2:1 / 4:1 / 10:1 */
+/* ratios: 1.5:1 / 2:1 / 2.5:1 / 3:1 / 4:1 / 6:1 / 8:1 / 10:1 */
 GM_ALWAYS_INLINE(gm_ratio_label)
 static inline int gm_ratio_label(unsigned int value, char *out)
 {
     int n = 0;
-    if (value == 0u) { out[n++] = '1'; out[n++] = '.'; out[n++] = '5'; }
-    else { n = gm_int_text((value == 1u) ? 2 : (value == 2u) ? 4 : 10, out, 0); }
+    if (value == 0u || value == 2u) { out[n++] = (value == 0u) ? '1' : '2'; out[n++] = '.'; out[n++] = '5'; }
+    else n = gm_int_text((value == 1u) ? 2 : (value == 3u) ? 3 : (value == 4u) ? 4 : (value == 5u) ? 6 : (value == 6u) ? 8 : 10, out, 0);
     out[n++] = ':'; out[n++] = '1'; out[n] = 0;
     return n;
 }
@@ -547,8 +549,8 @@ void GOOEYMB_AUDIO_FUNC(unsigned int *ctx)
     u[1] = gm_ui_thr(params[GOOEYMB_HITHR_SLOT], (float)GOOEYMB_HITHR_UI_DEFAULT);
     u[2] = gm_ui(params[GOOEYMB_XOVER_SLOT], (float)GOOEYMB_XOVER_UI_DEFAULT, 20.0f);
     u[3] = gm_ui(params[GOOEYMB_LEVEL_SLOT], (float)GOOEYMB_LEVEL_UI_DEFAULT, 30.0f);
-    u[4] = gm_ui(params[GOOEYMB_LORAT_SLOT], (float)GOOEYMB_LORAT_UI_DEFAULT, 3.0f);
-    u[5] = gm_ui(params[GOOEYMB_HIRAT_SLOT], (float)GOOEYMB_HIRAT_UI_DEFAULT, 3.0f);
+    u[4] = gm_ui(params[GOOEYMB_LORAT_SLOT], (float)GOOEYMB_LORAT_UI_DEFAULT, 7.0f);
+    u[5] = gm_ui(params[GOOEYMB_HIRAT_SLOT], (float)GOOEYMB_HIRAT_UI_DEFAULT, 7.0f);
     u[6] = gm_ui(params[GOOEYMB_ATTCK_SLOT], (float)GOOEYMB_ATTCK_UI_DEFAULT, 5.0f);
     u[7] = gm_ui(params[GOOEYMB_RELS_SLOT],  (float)GOOEYMB_RELS_UI_DEFAULT,  4.0f);
     u[8] = gm_ui(params[GOOEYMB_MIX_SLOT],   (float)GOOEYMB_MIX_UI_DEFAULT,   100.0f);
