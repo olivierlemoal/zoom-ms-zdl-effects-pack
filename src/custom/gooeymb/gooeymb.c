@@ -34,8 +34,9 @@
  *
  * METER: Gooey's live cover (src/custom/common/zdl_meter.h): the low band's level before its gain
  * (what the low detector sees), the line at LoThr (tag "LO"), so what pokes over the line is what
- * the low band compresses; the HiThr value in a second tag at the bottom. The output level would
- * sit over the line by the makeup. The tag font has no O: the zero glyph draws it.
+ * the low band compresses. The bottom tag shows the low band's gain reduction ("GR -4.5", the most
+ * of the last 0.25 s) while HiThr is OFF, else the HiThr value. The output level would sit over
+ * the line by the makeup. The tag font has no O: the zero glyph draws it.
  *
  * Pedal-safe rules (docs/SAFE-DSP-RULES.md): no static arrays in .audio, no divide, no libm,
  * no switch, no double, helpers forced inline, state in the arena with a magic.
@@ -55,7 +56,8 @@
 #define GM_BLOCK_LOOP()
 #endif
 
-#define GM_MAGIC     0x474D4232u            /* "GMB2": change when GmState changes */
+#define GM_MAGIC     0x474D4233u            /* "GMB3": change when GmState changes */
+#define GM_GR_HOLD   1378u                  /* blocks between gain reduction readouts: 0.25 s */
 #define GM_KEY_NONE  0xFFFFFFFFu
 #define GM_DPK       0.99638f               /* high band peak follower fall per block: 50 ms */
 #define GM_CMS       0.03563f               /* high band mean-square follower per block: 5 ms */
@@ -91,6 +93,8 @@ typedef struct {
     float cA, cR, a1, a2, a3;               /* ballistics; crossover filter coefficients */
     float pkenv[2], ms[2], rS[2], rF[2], gm[2];   /* per band: 0 low, 1 high */
     float lg;                               /* output ceiling gain */
+    float grpk;                             /* most low band gain reduction (dB) since the last readout */
+    unsigned int grshow, grcnt;             /* the readout in tenths of a dB; blocks since it */
     float xf[12];                           /* crossover states: per side split, low, high (2 each) */
     ZmState zm;                             /* the cover meter */
     unsigned int seal[ZA_NSEAL(240)];       /* every word's bits 30, 29 between blocks (zarena.h) */
@@ -188,7 +192,7 @@ static inline void gm_reset(GmState *s)
 {
     int i;
     for (i = 0; i < 2; i++) { s->pkenv[i] = 0.0f; s->ms[i] = 0.0f; s->rS[i] = 0.0f; s->rF[i] = 0.0f; s->gm[i] = 1.0f; }
-    s->lg = 1.0f;
+    s->lg = 1.0f; s->grpk = 0.0f;
     for (i = 0; i < 12; i++) s->xf[i] = 0.0f;
 }
 
@@ -198,6 +202,7 @@ static inline void gm_init(GmState *s)
     gm_reset(s);
     s->k_att = GM_KEY_NONE; s->k_rel = GM_KEY_NONE; s->k_xo = GM_KEY_NONE;
     s->cA = 0.0f; s->cR = 0.0f; s->a1 = 1.0f; s->a2 = 0.0f; s->a3 = 0.0f; s->was_off = 0u;
+    s->grshow = 0u; s->grcnt = 0u;
     zm_init(&s->zm);
     ZA_ZERO_TAIL(s, GmState);
     s->magic = GM_MAGIC;
@@ -281,20 +286,27 @@ static inline unsigned int gm_tag_text(char *t, char a, char b, unsigned int thr
     return zm_tenths(400u - thr, t, thr < 400u ? 4u : 3u);
 }
 
-/* once per on-screen block: history column; line and tags for LoThr/HiThr; frame (zoom x1: the knob is Level) */
+/* once per on-screen block: history column; line and tags for LoThr and the bottom tag (gain
+ * reduction while HiThr is OFF, else HiThr); frame (zoom x1: the knob is Level) */
 GM_ALWAYS_INLINE(gm_meter)
 static inline void gm_meter(GmState *s, const float *u)
 {
     ZmState *z = &s->zm;
-    unsigned int lo = (unsigned int)(int)u[0], hi = (unsigned int)(int)u[1];
-    unsigned int key = lo | (hi << 9);
+    unsigned int lo = (unsigned int)(int)u[0], hi = (unsigned int)(int)u[1], gr = s->grshow, key;
+    if (++s->grcnt >= GM_GR_HOLD) {
+        s->grcnt = 0u;
+        gr = (unsigned int)(int)(s->grpk * 10.0f + 0.5f);
+        if (gr > 399u) gr = 399u;
+        s->grshow = gr; s->grpk = 0.0f;
+    }
+    key = lo | (hi << 9) | ((hi >= 400u ? gr : 0u) << 18);
     if (zm_column(z)) zm_push(z);
     if (key != z->key && z->pos >= ZM_RAW) {
         char t[12];
         zm_scale(z, ((float)(int)lo - 400.0f) * 0.1f, 1.0f);
         z->key = key; z->dirty = 1u;
         zm_tag_set(&z->tag[0], t, gm_tag_text(t, 'L', '0', lo), 126u, ZM_MID - 2u);
-        zm_tag_set(&z->tag[1], t, gm_tag_text(t, 'H', 'I', hi), 126u, 62u);
+        zm_tag_set(&z->tag[1], t, hi >= 400u ? gm_tag_text(t, 'G', 'R', 400u - gr) : gm_tag_text(t, 'H', 'I', hi), 126u, 62u);
     }
     zm_frame(z);
 }
@@ -358,6 +370,7 @@ static inline void gm_process(GmState *s, const GmParams *P, float *restrict buf
         s->rS[b] = rS; s->rF[b] = rF;
         tot = rS + rF;
         gt[b] = P->dryG + P->wetG * gm_exp2(P->mk[b] - tot);
+        if (b == 0 && s->zm.on && tot * 6.0206f > s->grpk) s->grpk = tot * 6.0206f;
     }
 
     /* 3. sum the bands, each gain moved in a line over the block (no zipper); the makeup lifts a note's
