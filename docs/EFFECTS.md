@@ -328,7 +328,7 @@ Gooey's compressor split in a low and a high band, so a loud low note is held on
 | Rels | 0.1, 0.3, 0.6, 1.2 s, AUTO | Both bands; AUTO as in Gooey. Default AUTO. |
 | Mix | 0..100 | Linear dry/wet inside each band (parallel compression); the dry part is the summed bands, so it never combs against the crossover. Default 100. |
 
-Try on a bass: XOver 141 Hz, LoThr -20, LoRat 4, HiThr -16, HiRat 2, Attck 10 ms, Rels AUTO to even out the low strings and keep the pick or finger attack; Attck 30 ms and HiThr 0 to only hold the lows; LoRat 10, Attck 1 ms for slap. The cover is Gooey's live meter, here on the low band before its gain, with the LoThr line tagged LO: what pokes over the line is what the low band compresses, so set LoThr until only your loud notes cross it. The HiThr value is in a second tag at the bottom; the high band is not on the meter.
+Try on a bass: XOver 141 Hz, LoThr -20, LoRat 4, HiThr -16, HiRat 2, Attck 10 ms, Rels AUTO to even out the low strings and keep the pick or finger attack; Attck 30 ms and HiThr 0 to only hold the lows; LoRat 10, Attck 1 ms for slap. The cover is Gooey's live meter, here on the low band before its gain, with the LoThr line tagged LO: what pokes over the line is what the low band compresses, so set LoThr until only your loud notes cross it. While HiThr is OFF, the bottom tag reads the low band's gain reduction (GR -4.5: the most of the last 0.25 s); 3 to 6 dB on the loud notes is a common target. With HiThr on, that tag shows the HiThr value instead; the high band is not on the meter.
 
 ### GRDLOOP: a bar-synced looper on the song grid
 

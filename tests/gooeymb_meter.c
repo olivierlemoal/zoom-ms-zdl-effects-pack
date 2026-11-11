@@ -34,13 +34,14 @@ static void eff_block(const float *u, float amp, int b)
     for (i = 0; i < 16; i++) last_out = fabsf(buf[i]) > last_out ? fabsf(buf[i]) : last_out;
 }
 
-/* custom_covers.meter_geometry("gooeymb") */
+/* custom_covers.meter_geometry("gooeymb"); the bottom tag is the gain reduction readout while HiThr is OFF */
 static void eff_geom(const float *u, int *by, RefTag *tags, int *nt)
 {
     *by = (int)ZM_MID;
     snprintf(tags[0].text, sizeof tags[0].text, "L0 %.1f", (u[0] - 400) / 10.0);
     tags[0].xr = 126; tags[0].yb = *by - 2;
-    snprintf(tags[1].text, sizeof tags[1].text, "HI %.1f", (u[1] - 400) / 10.0);
+    if (u[1] >= 400.0f) snprintf(tags[1].text, sizeof tags[1].text, "GR %.1f", -(double)((S.zm.key >> 18) & 511u) / 10.0 + 0.0);
+    else snprintf(tags[1].text, sizeof tags[1].text, "HI %.1f", (u[1] - 400) / 10.0);
     tags[1].xr = 126; tags[1].yb = 62; *nt = 2;
 }
 static void eff_randk(float *u) { u[0] = (float)(rand() % 401); u[1] = (float)(rand() % 401); u[3] = (float)(rand() % 31); }
@@ -64,6 +65,21 @@ int main(void)
         shown = ZM_DB0 - (float)S.zm.lv[(S.zm.head - 1u) & 255u] / 16.0f;
         CHECK(fabsf(shown + 20.0f) < 0.5f, "%s: 49 Hz at -20 dBFS shown at %.2f dB",
               g == 0 ? "LoThr -20" : g == 1 ? "LoThr -40" : "Mix 0", shown);
+    }
+
+    /* the bottom tag reads the low band's gain reduction while HiThr is OFF: 49 Hz at -20 dBFS,
+     * LoThr -40 4:1 holds it about 15 dB down; the readout follows the gain computer */
+    {
+        float gr;
+        zmt_reset(1u, 1u);
+        memcpy(u, udef, sizeof u); u[0] = 0.0f; u[1] = 400.0f;
+        tone = 0.007f;
+        for (b = 0; b < 5512 * 2; b++) eff_block(u, 0.1f, b);
+        gr = (S.rS[0] + S.rF[0]) * 6.0206f;
+        printf("GR readout %u tenths, gain computer %.2f dB\n", S.grshow, gr);
+        CHECK(S.grshow > 120u && fabsf((float)S.grshow * 0.1f - gr) < 0.5f, "GR readout %u tenths vs %.2f dB", S.grshow, gr);
+        /* the tag takes a new readout at the next frame boundary: it may lag one readout */
+        CHECK(abs((int)((S.zm.key >> 18) & 511u) - (int)S.grshow) <= 3, "GR tag not updated: key %u, readout %u", (S.zm.key >> 18) & 511u, S.grshow);
     }
 
     /* a high note shows far under its output: the high band is not on this meter */

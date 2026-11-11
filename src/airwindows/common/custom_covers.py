@@ -574,8 +574,9 @@ def meter_geometry(folder, knobs):
         return by, [(f"CEIL {(ceil - 60) / 10:.1f}", 126, by - 2), (f"GAIN {gain / 10:+.1f}", 126, 62)]
     if folder == "gooeymb":                   # "L0" draws LO: the tag font has no O
         top, lo, hi = 17, knobs[0], knobs[1]
-        by = (top + 64) // 2
-        return by, [(f"L0 {(lo - 400) / 10:.1f}", 126, by - 2), (f"HI {(hi - 400) / 10:.1f}", 126, 62)]
+        by = (top + 64) // 2                  # bottom tag: gain reduction while HiThr is OFF (none yet on the cover)
+        bottom = "GR 0.0" if hi >= 400 else f"HI {(hi - 400) / 10:.1f}"
+        return by, [(f"L0 {(lo - 400) / 10:.1f}", 126, by - 2), (bottom, 126, 62)]
     top, thr = 17, knobs[0]
     by = (top + 64) // 2
     return by, [(f"THRSH {(thr - 400) / 10:.1f}", 126, by - 2)]

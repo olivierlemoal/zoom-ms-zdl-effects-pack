@@ -5,7 +5,7 @@
   "gid_comment": "0x08 = Delay category -> Fx_DLY_. Grouped under DLY with the rest of the pack.",
   "fxid": 947,
   "fxid_comment": "947: free in every gid across the known collections (themanro/ZoomMultistompZDL docs/FXID-REGISTRY.md, 'Next available fxid', checked 2026-10-29). Pack IDs: 480 DualShft, 481 LOUDER, 485 DubSiren, 486 Choral, 487 WaveFold, 488 EuGate, 489 S.GN_L, 490 Scrub, 491 DirtBox, 492 Washout, 493 Breather, 494 Takeoff, 495 GRDELAY, 496 Sweep, 497 Looper, 501 Gooey, 502 DJFilter.",
-  "fxid_version": "1.04",
+  "fxid_version": "1.05",
   "flags_byte": 1,
   "params": [
     {"name": "LoThr", "max": 400, "default": 400,
