@@ -22,7 +22,7 @@ static GmState S;
 
 /* screen values: LoThr, HiThr, XOver, Level, LoRat, HiRat, Attck, Rels, Mix */
 typedef struct { float lo, hi, xo, lr, hr, att, rel, mix, lv; } K;
-static K kd(void) { K k = { 400, 400, 9, 2, 1, 4, 4, 100, 24 }; return k; }
+static K kd(void) { K k = { 400, 400, 9, 4, 1, 4, 4, 100, 24 }; return k; }
 
 static void run_from(int n, K k, int from_block, K k2)
 {
@@ -90,9 +90,9 @@ int main(void)
     /* ---- 2. each band compresses only its range ---- */
     {
         K k = kd(); float a[2], b2[2], c[2], d[2];
-        k.lo = 100; k.lr = 2;                                 /* low band -30 dB, 4:1 */
+        k.lo = 100; k.lr = 4;                                 /* low band -30 dB, 4:1 */
         steady_gr(k, 50.0f, -6.0f, a); steady_gr(k, 2000.0f, -6.0f, b2);
-        k = kd(); k.hi = 100; k.hr = 2;                       /* high band -30 dB, 4:1 */
+        k = kd(); k.hi = 100; k.hr = 4;                       /* high band -30 dB, 4:1 */
         steady_gr(k, 50.0f, -6.0f, c); steady_gr(k, 2000.0f, -6.0f, d);
         printf("LoThr -30 4:1: 50 Hz GR %.2f dB, 2 kHz %.2f; HiThr -30: 50 Hz %.2f, 2 kHz %.2f (want about 18 where it compresses)\n",
                a[0], b2[0], c[1], d[1]);
@@ -102,10 +102,15 @@ int main(void)
         CHECK(c[1] < 0.1f, "high band reacts to 50 Hz: %.2f dB", c[1]);
         CHECK(a[1] == 0.0f && d[0] == 0.0f, "a band at 0 dB (OFF) reduced: %.2f, %.2f", a[1], d[0]);
         /* ratio per band: 10:1 on the low band, 1.5:1 on the high (24 dB over: 21.6 and 8) */
-        k = kd(); k.lo = 100; k.lr = 3; steady_gr(k, 50.0f, -6.0f, a);
+        k = kd(); k.lo = 100; k.lr = 7; steady_gr(k, 50.0f, -6.0f, a);
         k = kd(); k.hi = 100; k.hr = 0; steady_gr(k, 2000.0f, -6.0f, d);
         printf("LoRat 10:1 on 50 Hz: %.2f dB (21.6); HiRat 1.5:1 on 2 kHz: %.2f dB (8.0)\n", a[0], d[1]);
         CHECK(fabsf(a[0] - 21.6f) < 1.5f && fabsf(d[1] - 8.0f) < 1.0f, "ratios per band: %.2f, %.2f", a[0], d[1]);
+        /* the in-between steps: 3:1 and 6:1 on the low band (24 dB over: 16.0 and 20.0) */
+        k = kd(); k.lo = 100; k.lr = 3; steady_gr(k, 50.0f, -6.0f, a);
+        k = kd(); k.lo = 100; k.lr = 5; steady_gr(k, 50.0f, -6.0f, b2);
+        printf("LoRat 3:1 on 50 Hz: %.2f dB (16.0); 6:1: %.2f dB (20.0)\n", a[0], b2[0]);
+        CHECK(fabsf(a[0] - 16.0f) < 1.5f && fabsf(b2[0] - 20.0f) < 1.5f, "3:1 / 6:1 steps: %.2f, %.2f", a[0], b2[0]);
     }
 
     /* ---- 3. the point of it: a loud low note pressed down, the harmonics over it keep their level ---- */
@@ -126,7 +131,7 @@ int main(void)
     {
         const float f = (float)SR / 1072.0f;                 /* 41.13 Hz: whole periods in the window */
         K k = kd(); float f1, f3;
-        k.lo = 100; k.lr = 3;                                 /* -30 dB, 10:1, default 10 ms / AUTO */
+        k.lo = 100; k.lr = 7;                                 /* -30 dB, 10:1, default 10 ms / AUTO */
         sine(inL, SR * 2, f, 0.7f); memcpy(inR, inL, sizeof(float) * SR * 2);
         run(SR * 2, k);
         f1 = amp_at(outL, SR, SR + 1072 * 40, f); f3 = amp_at(outL, SR, SR + 1072 * 40, 3.0f * f);
@@ -141,7 +146,7 @@ int main(void)
         const int on = SR, cut = SR * 4, n = SR * 8;
         K k = kd(); float g, early, late, quiet, worst = -100.0f;
         int j;
-        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1, default 10 ms / AUTO */
+        k.lo = 100; k.lr = 4;                                 /* -30 dB, 4:1, default 10 ms / AUTO */
         sine(inL, SR * 2, f, 0.5f); memcpy(inR, inL, sizeof(float) * SR * 2);
         run(SR * 2, k);
         g = db(amp_at(outL, SR, SR + 882 * 20, f) / 0.5f);
@@ -170,7 +175,7 @@ int main(void)
     {
         const int on = SR / 2;
         K k = kd(); float pk, settled;
-        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1, makeup +18 dB, attack 10 ms */
+        k.lo = 100; k.lr = 4;                                 /* -30 dB, 4:1, makeup +18 dB, attack 10 ms */
         for (i = 0; i < SR; i++) inL[i] = inR[i] = i < on ? 0.0f : 0.7f * sinf(6.2831853f * 50.0f * (float)(i - on) / (float)SR);
         run(SR, k);
         pk = db(peak(outL, on, on + SR / 20)); settled = db(peak(outL, SR - 4000, SR));
@@ -182,7 +187,7 @@ int main(void)
     /* ---- 4c. Level is a plain output level: -12 dB on the output, the same gain reduction ---- */
     {
         K k = kd(); float a, b, gra, grb;
-        k.lo = 100; k.lr = 2;                                 /* -30 dB, 4:1 */
+        k.lo = 100; k.lr = 4;                                 /* -30 dB, 4:1 */
         sine(inL, SR * 2, 50.0f, 0.25f); memcpy(inR, inL, sizeof(float) * SR * 2);
         run(SR * 2, k); a = peak(outL, SR, SR * 2); gra = (S.rS[0] + S.rF[0]) * 6.0206f;
         k.lv = 12;                                            /* -12 dB */
@@ -226,7 +231,7 @@ int main(void)
             inL[i] = a * sinf(0.09f * (float)i); inR[i] = 0.5f * inL[i];
         }
         run(SR * 2, k); memcpy(refL, outL, sizeof(float) * SR * 2);     /* the bands uncompressed */
-        k.lo = 0; k.hi = 0; k.lr = 3; k.hr = 3; k.att = 0; k.rel = 0;
+        k.lo = 0; k.hi = 0; k.lr = 7; k.hr = 7; k.att = 0; k.rel = 0;
         run(SR * 2, k);
         for (i = 100; i < SR * 2; i++) {             /* 632 Hz is all high band: out / ref is its gain */
             if (!(fabsf(outL[i]) < 4.0f) || !(fabsf(outR[i]) < 4.0f)) bad++;
@@ -264,7 +269,10 @@ int main(void)
         ZDL_GetLabel_0(399, t); CHECK(!strcmp(t, "-0.1"), "LoThr 399 label %s", t);
         ZDL_GetLabel_1(225, t); CHECK(!strcmp(t, "-17.5"), "HiThr 225 label %s", t);
         ZDL_GetLabel_4(0, t);  CHECK(!strcmp(t, "1.5:1"), "LoRat 0 label %s", t);
-        ZDL_GetLabel_5(3, t);  CHECK(!strcmp(t, "10:1"), "HiRat 3 label %s", t);
+        ZDL_GetLabel_4(2, t);  CHECK(!strcmp(t, "2.5:1"), "LoRat 2 label %s", t);
+        ZDL_GetLabel_4(3, t);  CHECK(!strcmp(t, "3:1"), "LoRat 3 label %s", t);
+        ZDL_GetLabel_4(5, t);  CHECK(!strcmp(t, "6:1"), "LoRat 5 label %s", t);
+        ZDL_GetLabel_5(7, t);  CHECK(!strcmp(t, "10:1"), "HiRat 7 label %s", t);
         ZDL_GetLabel_6(5, t);  CHECK(!strcmp(t, "30ms"), "Attck 5 label %s", t);
         ZDL_GetLabel_7(4, t);  CHECK(!strcmp(t, "AUTO"), "Rels 4 label %s", t);
     }
