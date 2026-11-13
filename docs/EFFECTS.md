@@ -309,6 +309,27 @@ An SSL G-bus style VCA compressor to glue a mix: one character, done well. One g
 
 Try: Thrsh -12, Ratio 2, Attck 30 ms, Rels AUTO, MkUp AUTO, SC HP 100 Hz on a full mix for glue; Ratio 10, Attck 1 ms, Mix 50 on drums for parallel punch. The cover is a live meter drawn by the effect itself: a scrolling history of the last 4 beats of the output level (one column = 1/32 beat), with the threshold as a centered line tagged THRSH. It scrolls with the MIDI clock when it runs, else with tap or patch tempo. It works on any MS-70CDR on firmware 2.10, stock included, and on the MS-50G firmware 3.10 (tested on a stock MS-50G; see `src/custom/common/zdl_meter.h`); on other firmware the cover stays static.
 
+### GooeyMB: Gooey in two bands, for bass
+
+<img src="../graphics/gooeymb.png" width="320" alt="GooeyMB on the pedal screen">
+Stereo in and out. Tested on a stock MS-50G 3.10.
+
+Gooey's compressor split in a low and a high band, so a loud low note is held on its own and does not pull down the attack and the harmonics above it. A Linkwitz-Riley 24 dB/oct crossover splits the sound; the two bands sum back flat in level (with a phase turn around the crossover, so even with both bands OFF the output is not bit-exact). Each band has Gooey's detector, soft knee and ballistics, one gain for both sides; the low band's detector is slower (peak fall 150 ms, RMS 20 ms) so the gain does not follow the cycles of a low note. Makeup is a fixed AUTO per band, set by its threshold and ratio: a note at -6 dBFS comes out at its level, quieter notes come up. It does not move with time, so a held note does not swell and quiet notes after a loud passage are not pushed up. The makeup lifts the attack of a note until the detector catches it, so the output has a -1 dBFS ceiling (instant attack, 50 ms release) that holds those attacks.
+
+| Knob | Range | What it does |
+|---|---|---|
+| LoThr | -40 .. 0 dB | Low band threshold in 0.1 dB steps. 0 dB shows OFF: that band is not compressed. Default OFF. |
+| HiThr | -40 .. 0 dB | High band threshold, same scale. Default OFF. |
+| XOver | 60 .. 400 Hz | Crossover between the bands, log steps. Default 141 Hz. |
+| Level | -24 .. +6 dB | Output level, dry and wet alike, before the -1 dBFS ceiling. The makeup brings what you play towards -6 dBFS, so a soft player gets much louder: turn Level down until on and off sound as loud. No change to the compression. Default 0 dB. |
+| LoRat | 1.5, 2, 2.5, 3, 4, 6, 8, 10 | Low band ratio. No effect while LoThr is OFF. Default 4. |
+| HiRat | 1.5, 2, 2.5, 3, 4, 6, 8, 10 | High band ratio. No effect while HiThr is OFF. Default 2. |
+| Attck | 0.1, 0.3, 1, 3, 10, 30 ms | Both bands. Default 10 ms. |
+| Rels | 0.1, 0.3, 0.6, 1.2 s, AUTO | Both bands; AUTO as in Gooey. Default AUTO. |
+| Mix | 0..100 | Linear dry/wet inside each band (parallel compression); the dry part is the summed bands, so it never combs against the crossover. Default 100. |
+
+Try on a bass: XOver 141 Hz, LoThr -20, LoRat 4, HiThr -16, HiRat 2, Attck 10 ms, Rels AUTO to even out the low strings and keep the pick or finger attack; Attck 30 ms and HiThr 0 to only hold the lows; LoRat 10, Attck 1 ms for slap. The cover is Gooey's live meter, here on the low band before its gain, with the LoThr line tagged LO: what pokes over the line is what the low band compresses, so set LoThr until only your loud notes cross it. While HiThr is OFF, the bottom tag reads the low band's gain reduction (GR -4.5: the most of the last 0.25 s); 3 to 6 dB on the loud notes is a common target. With HiThr on, that tag shows the HiThr value instead; the high band is not on the meter.
+
 ### GRDLOOP: a bar-synced looper on the song grid
 
 <img src="../graphics/grdloop.png" width="320" alt="GRDLOOP on the pedal screen">

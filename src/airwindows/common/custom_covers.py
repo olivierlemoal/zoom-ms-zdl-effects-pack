@@ -567,11 +567,16 @@ def meter_frame(title, by, tags, rows=None):
 
 def meter_geometry(folder, knobs):
     """(by, tags) of the effect's meter at these knob values (screen values, manifest order).
-    Same numbers as the C (lo_meter / go_meter): the line stays mid-meter (ZM_MID)."""
+    Same numbers as the C (lo_meter / go_meter / gm_meter): the line stays mid-meter (ZM_MID)."""
     if folder == "louder":
         top, gain, ceil = 16, knobs[0], knobs[1]
         by = (top + 64) // 2
         return by, [(f"CEIL {(ceil - 60) / 10:.1f}", 126, by - 2), (f"GAIN {gain / 10:+.1f}", 126, 62)]
+    if folder == "gooeymb":                   # "L0" draws LO: the tag font has no O
+        top, lo, hi = 17, knobs[0], knobs[1]
+        by = (top + 64) // 2                  # bottom tag: gain reduction while HiThr is OFF (none yet on the cover)
+        bottom = "GR 0.0" if hi >= 400 else f"HI {(hi - 400) / 10:.1f}"
+        return by, [(f"L0 {(lo - 400) / 10:.1f}", 126, by - 2), (bottom, 126, 62)]
     top, thr = 17, knobs[0]
     by = (top + 64) // 2
     return by, [(f"THRSH {(thr - 400) / 10:.1f}", 126, by - 2)]
